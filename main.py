@@ -8,14 +8,16 @@ import numpy as np
 from scipy.signal import savgol_filter
 
 
-def get_landmarks(path, type):
+def get_landmarks(path, type, calculate_again=False):
     """
     Analyse videos landmarks.
 
+    :param type:
+    :param calculate_again:
     :param path: path to video
     :return:
     """
-    if os.path.exists(f'swings/{path}.pkl'):
+    if os.path.exists(f'swings/{path}.pkl') and not calculate_again:
         f = open(f'swings/{path}.pkl', 'rb')
         ld = pickle.load(f)
         f.close()
@@ -73,6 +75,8 @@ def get_landmarks(path, type):
 
 
 def get_weight_distribution(landmarks):
+    plt.style.use('Solarize_Light2')
+
     landmark_names = mp.solutions.pose.PoseLandmark
 
     left = [landmark_names.LEFT_KNEE, landmark_names.LEFT_HIP]
@@ -81,6 +85,12 @@ def get_weight_distribution(landmarks):
     back_swing = savgol_filter(
         [landmark[landmark_names.LEFT_ELBOW][1] for landmark in landmarks[:int(len(landmarks) / 2)]], 100, 3)
     back_swing_top = np.argmax(back_swing)
+
+    landmarks_post_top = landmarks[back_swing_top:]
+
+    impact_swing = savgol_filter(
+        [landmark[landmark_names.RIGHT_WRIST][1] for landmark in landmarks_post_top], 100, 3)
+    impact = np.argmin(impact_swing)
 
     weight = []
 
@@ -105,10 +115,12 @@ def get_weight_distribution(landmarks):
 
         weight.append(100 * (1 - min(1, weight_perc)))
 
-    fig, ax = plt.subplots(figsize=(9, 8), dpi=120)
+    fig, ax = plt.subplots()
 
-    plt.plot(savgol_filter(weight, 100, 3), linewidth=3.0)
-    plt.axvline(back_swing_top, color='k', linestyle='--', linewidth=0.7, label='Top of Swing')
+    plt.plot(savgol_filter(weight, 100, 3), linewidth=1.0)
+    plt.axvline(back_swing_top, linestyle='--', linewidth=1, label='Top of Swing')
+    plt.axvline(impact + back_swing_top, linestyle='-', linewidth=1, label='Impact')
+
     plt.xlabel('Frame')
     plt.ylabel('Weight Transfer Position')
     plt.title("Pro golf swing.")
@@ -117,8 +129,8 @@ def get_weight_distribution(landmarks):
 
 
 if __name__ == '__main__':
-    video = 'am_swing'
-    video_landmarks = get_landmarks(video, 'mp4')
+    video = 'swing'
+    video_landmarks = get_landmarks(video, 'mp4', False)
     get_weight_distribution(video_landmarks)
     #
     # video = 'w_swing'
